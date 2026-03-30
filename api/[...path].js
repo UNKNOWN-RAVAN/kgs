@@ -1,98 +1,111 @@
-// api/[...path].js - Pure proxy that forwards everything to original backend
-const axios = require('axios');
+// api/[...path].js
+import CryptoJS from 'crypto-js';
 
-// Original backend URL (change this to the actual backend)
-const BACKEND_URL = 'https://kgs-web.vercel.app';
+export default async function handler(req, res) {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-// Store cookies for session persistence
-let cookieJar = '';
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
-module.exports = async (req, res) => {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Sunny-Req, Cookie');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+  const { path } = req.query;
+  const requestedPath = path?.join('/') || '';
+
+  if (requestedPath === 'proxy' || req.url.includes('/api/proxy')) {
+    return handleProxy(req, res);
+  }
+
+  return res.status(404).json({ error: 'Not found' });
+}
+
+async function handleProxy(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { action, id } = req.body;
+
+    if (!action) {
+      return res.status(400).json({ error: 'Action is required' });
     }
 
-    // Get the full path from the request
-    const path = req.query.path ? req.query.path.join('/') : '';
-    const fullPath = `/api/${path}`;
-    
-    // Construct the target URL
-    const targetUrl = `${BACKEND_URL}${fullPath}`;
-    
-    // Prepare headers - forward all relevant headers
-    const headers = {
-        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
-        'Accept': req.headers['accept'] || 'application/json',
-        'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
-        'X-Sunny-Req': req.headers['x-sunny-req'] || 'sunny',
-        'X-Requested-With': 'XMLHttpRequest',
-    };
-    
-    // Forward cookies if we have them
-    if (cookieJar) {
-        headers['Cookie'] = cookieJar;
+    console.log(`📡 Fetching ${action}${id ? ` with id: ${id}` : ''}`);
+
+    // Fetch from original API
+    const response = await fetch('https://spidykgs.vercel.app/api/proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 11; V2052) AppleWebKit/537.36',
+        'Origin': 'https://spidykgs.vercel.app',
+        'Referer': 'https://spidykgs.vercel.app/',
+        'X-Requested-With': 'idm.internet.download.manager'
+      },
+      body: JSON.stringify({ action, id: id || null })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
     }
+
+    const encryptedData = await response.json();
     
-    // Forward any other important headers
-    if (req.headers['content-type']) {
-        headers['Content-Type'] = req.headers['content-type'];
-    }
+    // Decrypt the payload
+    let decryptedData = null;
     
-    if (req.headers['authorization']) {
-        headers['Authorization'] = req.headers['authorization'];
-    }
-    
-    try {
-        // Make the request to original backend
-        const response = await axios({
-            method: req.method,
-            url: targetUrl,
-            headers: headers,
-            data: req.method !== 'GET' ? req.body : undefined,
-            params: req.query,
-            validateStatus: () => true, // Don't throw on any status
-            timeout: 30000 // 30 second timeout
-        });
+    if (encryptedData.success && encryptedData.payload) {
+      try {
+        // AES Decryption
+        const bytes = CryptoJS.AES.decrypt(encryptedData.payload, 'MySuperSecretKey2025');
+        const decryptedString = bytes.toString(CryptoJS.enc.Utf8);
+        decryptedData = JSON.parse(decryptedString);
         
-        // Store cookies from response for future requests
-        if (response.headers['set-cookie']) {
-            cookieJar = response.headers['set-cookie'].join('; ');
+        console.log(`✅ Decrypted ${action} successfully`);
+        
+        // Normalize data format
+        if (action === 'courses') {
+          const courses = decryptedData.courses || decryptedData;
+          decryptedData = Array.isArray(courses) ? courses : Object.values(courses);
         }
         
-        // Forward the response status
-        res.status(response.status);
-        
-        // Forward all response headers
-        Object.entries(response.headers).forEach(([key, value]) => {
-            if (key !== 'content-encoding' && key !== 'transfer-encoding') {
-                res.setHeader(key, value);
-            }
+      } catch (decryptError) {
+        console.error('Decryption failed:', decryptError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to decrypt data',
+          raw: encryptedData
         });
-        
-        // Send the response data
-        res.send(response.data);
-        
-    } catch (error) {
-        console.error('Proxy error:', error.message);
-        
-        // If it's a network error or timeout, return error
-        if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
-            res.status(503).json({
-                error: 'Backend service unavailable',
-                message: 'Unable to reach the original server. Please try again later.'
-            });
-        } else {
-            res.status(500).json({
-                error: 'Proxy error',
-                message: error.message
-            });
-        }
+      }
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: 'Invalid response from API',
+        raw: encryptedData
+      });
     }
-};
+
+    // Return clean, decrypted data
+    return res.status(200).json({
+      success: true,
+      action: action,
+      data: decryptedData,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        totalItems: Array.isArray(decryptedData) ? decryptedData.length : 
+                   (decryptedData.courses ? decryptedData.courses.length : 
+                   Object.keys(decryptedData).length)
+      }
+    });
+
+  } catch (error) {
+    console.error('Proxy error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
