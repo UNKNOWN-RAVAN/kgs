@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   
-  // Get ID from query parameter (Vercel style)
+  // IMPORTANT: Vercel mein ID query se aati hai, path se nahi
   const { id } = req.query;
   
   console.log('Subjects request for ID:', id); // Debug log
