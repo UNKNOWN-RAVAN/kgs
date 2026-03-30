@@ -2,15 +2,27 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/[...path].js",
+      "src": "api/**/*.js",
       "use": "@vercel/node"
     },
     {
-      "src": "public/**",
+      "src": "public/**/*",
       "use": "@vercel/static"
     }
   ],
   "routes": [
+    {
+      "src": "/api/courses",
+      "dest": "/api/courses.js"
+    },
+    {
+      "src": "/api/subjects/([^/]+)",
+      "dest": "/api/subjects/[id].js"
+    },
+    {
+      "src": "/api/lessons/([^/]+)",
+      "dest": "/api/lessons/[id].js"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/api/[...path].js"
@@ -18,25 +30,6 @@
     {
       "src": "/(.*)",
       "dest": "/public/$1"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, X-Sunny-Req, Cookie"
-        }
-      ]
     }
   ]
 }
