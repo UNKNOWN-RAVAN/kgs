@@ -2,22 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.js",
+      "src": "api/index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/courses",
-      "dest": "/api/courses.js"
-    },
-    {
-      "src": "/api/subjects/([^/]+)",
-      "dest": "/api/subjects/[id].js"
-    },
-    {
-      "src": "/api/lessons/([^/]+)",
-      "dest": "/api/lessons/[id].js"
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
     }
   ]
 }
