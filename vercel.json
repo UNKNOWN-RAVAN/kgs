@@ -4,10 +4,6 @@
     {
       "src": "api/**/*.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "public/**/*",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -22,14 +18,6 @@
     {
       "src": "/api/lessons/([^/]+)",
       "dest": "/api/lessons/[id].js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/[...path].js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
     }
   ]
 }
