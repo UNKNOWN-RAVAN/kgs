@@ -1,16 +1,19 @@
 {
-  "name": "kgs-proxy-server",
+  "name": "kgs-proxy",
   "version": "1.0.0",
-  "description": "Pure proxy server for KGS educational platform",
+  "description": "KGS Proxy with auto-decryption - Real data from original API",
   "main": "api/[...path].js",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel deploy --prod"
   },
   "dependencies": {
-    "axios": "^1.6.0"
+    "crypto-js": "^4.2.0"
   },
   "devDependencies": {
     "vercel": "^32.0.0"
-  }
+  },
+  "keywords": ["proxy", "kgs", "decryption", "vercel"],
+  "author": "SPIDY UNIVERSE",
+  "license": "MIT"
 }
